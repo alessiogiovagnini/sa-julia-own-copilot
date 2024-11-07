@@ -1,6 +1,24 @@
 import sh
 from pathlib import Path
 import shutil
+from concurrent.futures import ThreadPoolExecutor
+import threading
+import random
+
+
+def multi_thread_analysis(all_urls: list[str], max_threads: int = 16) -> None:
+    with ThreadPoolExecutor(max_workers=max_threads) as executor:
+        executor.map(start_analysis, all_urls)
+    pass
+
+
+def start_analysis(repo_name: str):
+    full_path: str = f"https://github.com/{repo_name}"
+    current_thread_id: int = threading.get_ident()
+    random_num: int = random.randrange(0, 1000000, 1)
+    tmp_destination: Path = Path(f"tmp-{current_thread_id}-{random_num}")
+
+    analyze_repo(url=full_path, destination=tmp_destination)
 
 
 def analyze_repo(url: str, destination: Path) -> None:
