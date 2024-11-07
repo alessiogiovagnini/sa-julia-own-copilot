@@ -8,15 +8,38 @@ import os
 JULIA_LANGUAGE = Language(tree_sitter_julia.language())
 parser = Parser(JULIA_LANGUAGE)
 
+i = 0
+
 def extract_functions(node, code, functions):
+    # print(node.type)
+        
     if node.type == "function_definition":
         # Extract the full function text
         function_text = code[node.start_byte:node.end_byte].decode("utf8")
-        functions.append(function_text)
+        
+        docstring = find_docstring_before_function(code, node.start_byte)
+        
+        functions.append((docstring, function_text))
+
+        
         
     # Recursively visit children nodes
     for child in node.children:
         extract_functions(child, code, functions)
+
+
+def find_docstring_before_function(code, start_byte):
+    
+    previous_text = function_text = code[0:start_byte].decode("utf8")
+    
+    if previous_text[-4 : -1] == '"""':
+        
+        # we split after each triple double quotes to get the last docstring
+        previous_text_subsections = previous_text.split('"""')
+        return previous_text_subsections[-2]
+    else:
+        return None
+
 
 def save_to_csv(repo_name, file_path, output_file, functions):
 
@@ -29,11 +52,13 @@ def save_to_csv(repo_name, file_path, output_file, functions):
         
         # Write header if file is being created
         if write_mode == "w":
-            writer.writerow(["repository_name", "file_path", "function"])
+            writer.writerow(["repository_name", "file_path", "docstring", "function"])
 
         # Write each function to CSV
-        for function_text in functions:
-            writer.writerow([repo_name, file_path, function_text])
+        for function in functions:
+            writer.writerow([repo_name, file_path, function[0], function[1]])
+
+
 
 def main(repo_name, file_path, output_file):
     # Read code from file

@@ -15,6 +15,8 @@ max_normalize(x) = maximum(abs.(x)) == 0 ? x : x/maximum(abs.(x));
 std_normalize(x) = std(x) == 0 ? zeros(length(x)) : (x.-mean(x))./std(x);
 int_normalize(x) = std(x) == 0 ? zeros(length(x)) : (x.-minimum(x))/(maximum(x).-minimum(x))*2 .- 1;
 
+
+"""this is a docstring letsgoski"""
 function simulate_ising(n, h0, J)
     g = LightGraphs.grid([n,n]);
 
@@ -27,6 +29,19 @@ function simulate_ising(n, h0, J)
     return g, [adjacency_matrix(g)], y, f;
 end
 
+"""
+    bar(x[, y])
+
+Compute the Bar index between `x` and `y`.
+
+If `y` is unspecified, compute the Bar index between all pairs of columns of `x`.
+
+# Examples
+```julia-repl
+julia> bar([1, 2], [1, 2])
+1
+```
+"""
 function read_county(prediction, year)
     # construct graph
     adj = CSV.read("datasets/election/adjacency.txt", header=0);
@@ -112,6 +127,7 @@ function read_county(prediction, year)
 
     return g, [adjacency_matrix(g)], y, f;
 end
+
 
 function read_twitch(cnm, dim_reduction=false, dim_embed=8)
     #----------------------------------------------------------------------------
