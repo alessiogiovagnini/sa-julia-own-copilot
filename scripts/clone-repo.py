@@ -60,6 +60,7 @@ def start_script(csv_input: Path):
 
 if __name__ == '__main__':
     csv_path: Path = Path("./tmp_input_csv.csv")
+    start_script(csv_input=csv_path)
 
 
 
