@@ -5,6 +5,7 @@ import tree_sitter_julia
 import sys
 import csv
 import os
+from tqdm import tqdm
 
 # Load the Julia language
 JULIA_LANGUAGE = Language(tree_sitter_julia.language())
@@ -19,15 +20,28 @@ def extract_functions(node, code, functions):
     if node.type == "function_definition":
         # Extract the full function text
         function_text = code[node.start_byte:node.end_byte].decode("utf8")
-
+        
+        signature, body = split_function(function_text)
+        
         docstring = find_docstring_before_function(code, node.start_byte)
-
-        functions.append((docstring, function_text))
+        
+        functions.append((docstring, signature, body))
 
     # Recursively visit children nodes
     for child in node.children:
         extract_functions(child, code, functions)
 
+def split_function(function_str):
+    # Split the function string into lines
+    lines = function_str.split('\n')
+    
+    # First line is the function signature
+    signature = lines[0]
+    
+    # The rest of the function is the body (join remaining lines)
+    body = '\n'.join(lines[1:])
+    
+    return signature, body
 
 def find_docstring_before_function(code, start_byte):
     previous_text = function_text = code[0:start_byte].decode("utf8")
@@ -51,11 +65,13 @@ def save_to_csv(repo_name: str, file_path: Path, output_file: Path, functions):
 
         # Write header if file is being created
         if write_mode == "w":
-            writer.writerow(["repository_name", "file_path", "docstring", "function"])
+            writer.writerow(["repository_name", "file_path", "docstring", "function_signature", "function_body"])
 
         # Write each function to CSV
-        for function in functions:
-            writer.writerow([repo_name, file_path, function[0], function[1]])
+        
+        print('Writing on file:')
+        for function in tqdm(functions):
+            writer.writerow([repo_name, file_path, function[0], function[1], function[2]])
 
 
 def start_extraction(repo_name: str, file_path: Path, output_file: Path):
