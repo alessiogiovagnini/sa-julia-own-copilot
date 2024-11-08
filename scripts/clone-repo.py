@@ -18,10 +18,9 @@ def multi_thread_analysis(repo_names: list[str], max_threads: int = 16) -> None:
 def start_analysis_on_repo(repo_name: str):
     full_path: str = f"https://github.com/{repo_name}"
     current_thread_id: int = threading.get_ident()
-    random_num: int = random.randrange(0, 1000000, 1)
     tmp_repo_dir: Path = Path("./repos")
     tmp_repo_dir.mkdir(exist_ok=True)
-    tmp_destination: Path = Path(tmp_repo_dir, f"tmp-{current_thread_id}-{random_num}")
+    tmp_destination: Path = Path(tmp_repo_dir, f"tmp-{Path(repo_name).stem}-{current_thread_id}")
 
     analyze_repo(url=full_path, destination=tmp_destination, repo_name=repo_name)
 
@@ -35,14 +34,23 @@ def analyze_repo(url: str, destination: Path, repo_name: str) -> None:
         and it will be DELETED at the end with all the repository
     """
     destination.mkdir(exist_ok=True)
-    sh.git.clone(url, destination)
+    try:
+        sh.git.clone(url, destination)
+
+    except Exception as e:
+        print(e)
+        destination.rmdir()
+
+    if len(os.listdir(destination)) == 0:
+        destination.rmdir()
+        return
 
     csv_output_dir: Path = Path("./csv_output")
     csv_output_dir.mkdir(exist_ok=True)
 
-    random_num: int = random.randrange(0, 1000000, 1)
-    simple_repo_name: str = Path(repo_name).name
-    csv_output_file: Path = Path(csv_output_dir, f"{simple_repo_name}-{random_num}.csv")
+    current_thread_id: int = threading.get_ident()
+    simple_repo_name: str = Path(repo_name).stem
+    csv_output_file: Path = Path(csv_output_dir, f"{simple_repo_name}-{current_thread_id}.csv")
 
     for root, dirs, files in os.walk(destination):
         for file in files:
@@ -51,6 +59,7 @@ def analyze_repo(url: str, destination: Path, repo_name: str) -> None:
                 start_extraction(repo_name=repo_name, file_path=file_path, output_file=csv_output_file)
 
     shutil.rmtree(destination)
+    destination.rmdir()
 
     return
 
