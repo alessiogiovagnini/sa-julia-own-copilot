@@ -41,7 +41,8 @@ def analyze_repo(url: str, destination: Path, repo_name: str) -> None:
     csv_output_dir.mkdir(exist_ok=True)
 
     random_num: int = random.randrange(0, 1000000, 1)
-    csv_output_file: Path = Path(csv_output_dir, f"{repo_name}-{random_num}.csv")
+    simple_repo_name: str = Path(repo_name).name
+    csv_output_file: Path = Path(csv_output_dir, f"{simple_repo_name}-{random_num}.csv")
 
     for root, dirs, files in os.walk(destination):
         for file in files:
