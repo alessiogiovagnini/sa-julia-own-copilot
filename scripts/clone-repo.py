@@ -52,6 +52,8 @@ def analyze_repo(url: str, destination: Path, repo_name: str) -> None:
 
     shutil.rmtree(destination)
 
+    return
+
 
 def start_script(csv_input: Path):
     df: DataFrame = read_csv(csv_input)
