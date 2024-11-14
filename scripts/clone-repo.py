@@ -1,5 +1,5 @@
 import os
-from pandas import read_csv, DataFrame
+from pandas import read_csv
 import sh
 from pathlib import Path
 import shutil
@@ -65,7 +65,7 @@ def analyze_repo(url: str, destination: Path, repo_name: str) -> None:
 
 
 def start_script(csv_input: Path):
-    df: DataFrame = read_csv(csv_input)
+    df = read_csv(csv_input)
     all_repos_names: list[str] = df["name"].to_list()
     multi_thread_analysis(repo_names=all_repos_names)
 
