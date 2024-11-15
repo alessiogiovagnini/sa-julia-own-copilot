@@ -5,7 +5,6 @@ from pathlib import Path
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 import threading
-import random
 from julia_function_extractor import start_extraction
 
 
@@ -30,7 +29,7 @@ def analyze_repo(url: str, destination: Path, repo_name: str) -> None:
     clone a repository in the destination folder and analyze its content
     :param repo_name: name of the repository, like: author/repo-name
     :param url: the url of the repository, like https://github.com/author/repo-name
-    :param destination: path where the repo is cloned, the folder target will be created if it not exist
+    :param destination: path where the repo is cloned, the folder target will be created if it not exists,
         and it will be DELETED at the end with all the repository
     """
     destination.mkdir(exist_ok=True)
@@ -81,11 +80,3 @@ def start_script(csv_input: Path):
 if __name__ == '__main__':
     csv_path: Path = Path("./julia_repo_list.csv")
     start_script(csv_input=csv_path)
-
-
-
-
-
-
-
-
