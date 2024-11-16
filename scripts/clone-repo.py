@@ -11,7 +11,7 @@ from julia_function_extractor import start_extraction
 def multi_thread_analysis(repo_names: list[str], max_threads: int = 16) -> None:
     with ThreadPoolExecutor(max_workers=max_threads) as executor:
         executor.map(start_analysis_on_repo, repo_names)
-    print("Program finished!")
+    print("####### Program finished! ########")
 
 
 def start_analysis_on_repo(repo_name: str):
@@ -37,7 +37,7 @@ def analyze_repo(url: str, destination: Path, repo_name: str) -> None:
         sh.git.clone(url, destination)
 
     except Exception as e:
-        print(f"Failed to clone repository {url}")
+        print(f"####### Failed to clone repository {url}")
         print(e)
         destination.rmdir()
 
@@ -52,7 +52,7 @@ def analyze_repo(url: str, destination: Path, repo_name: str) -> None:
     simple_repo_name: str = Path(repo_name).stem
     csv_output_file: Path = Path(csv_output_dir, f"{simple_repo_name}-{current_thread_id}.csv")
 
-    print(f"Start reading {destination}")
+    print(f"###### Start reading {destination}")
 
     for root, dirs, files in os.walk(destination):
         for file in files:
@@ -61,13 +61,13 @@ def analyze_repo(url: str, destination: Path, repo_name: str) -> None:
                 try:
                     start_extraction(repo_name=repo_name, file_path=file_path, output_file=csv_output_file)
                 except Exception as e:
-                    print(f"Failed to read file {file_path}")
+                    print(f"######## Failed to read file {file_path}")
                     print(e)
 
     shutil.rmtree(destination)
     destination.rmdir()
 
-    print(f"End reading {destination}")
+    print(f"####### End reading {destination}")
     return
 
 
