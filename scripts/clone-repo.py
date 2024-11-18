@@ -10,7 +10,11 @@ from julia_function_extractor import start_extraction
 
 def multi_thread_analysis(repo_names: list[str], max_threads: int = 16) -> None:
     with ThreadPoolExecutor(max_workers=max_threads) as executor:
-        executor.map(start_analysis_on_repo, repo_names)
+        try:
+            executor.map(start_analysis_on_repo, repo_names, timeout=600)
+        except TimeoutError as e:
+            print("######## Timeout")
+            print(e)
     print("####### Program finished! ########")
 
 
