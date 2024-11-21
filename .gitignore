@@ -10,6 +10,7 @@ scripts/repos/*
 # Distribution / packaging
 .Python
 build/
+benchmark/
 develop-eggs/
 dist/
 downloads/
