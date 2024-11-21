@@ -28,12 +28,14 @@ def main():
 
     filtered_df = df[df["name"].apply(func=filter_row)]
 
-    # print(df["name"].size)
-    # print(filtered_df["name"].size)
-    # print(df["name"].size - filtered_df["name"].size)
-    # print(len(files_list))
+    print(df["name"].size)
+    print(filtered_df["name"].size)
+    print(df["name"].size - filtered_df["name"].size)
+    print(len(files_list))
 
-    print(filtered_df["name"])
+    # print(filtered_df["name"])
+
+    filtered_df.to_csv(Path("./julia_repo_list_missing.csv"), index=False)
 
 
 if __name__ == '__main__':

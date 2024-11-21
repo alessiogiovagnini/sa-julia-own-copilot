@@ -14,7 +14,7 @@ def main():
     first_file: str = files_list.pop()
     first_file_path: Path = Path(csv_dir, first_file)
 
-    final_output_file: Path = Path("./merged_julia.csv")
+    final_output_file: Path = Path("./merged_julia_final.csv")
 
     if final_output_file.exists():
         print("File already exist")

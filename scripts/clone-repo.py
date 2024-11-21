@@ -62,11 +62,13 @@ def analyze_repo(url: str, destination: Path, repo_name: str) -> None:
         for file in files:
             if file.endswith(".jl"):
                 file_path: Path = Path(root, file)
-                try:
-                    start_extraction(repo_name=repo_name, file_path=file_path, output_file=csv_output_file)
-                except Exception as e:
-                    print(f"######## Failed to read file {file_path}")
-                    print(e)
+                size = os.path.getsize(file_path)
+                if size < 1024 * 1024:
+                    try:
+                        start_extraction(repo_name=repo_name, file_path=file_path, output_file=csv_output_file)
+                    except Exception as e:
+                        print(f"######## Failed to read file {file_path}")
+                        print(e)
 
     shutil.rmtree(destination)
     destination.rmdir()
@@ -78,7 +80,7 @@ def analyze_repo(url: str, destination: Path, repo_name: str) -> None:
 def start_script(csv_input: Path):
     df = pd.read_csv(csv_input)
     all_repos_names: list[str] = df["name"].to_list()
-    multi_thread_analysis(repo_names=all_repos_names)
+    multi_thread_analysis(repo_names=all_repos_names, max_threads=10)
 
 
 if __name__ == '__main__':
