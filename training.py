@@ -8,6 +8,10 @@ import evaluate
 
 # Define compute metrics function
 def compute_metrics(eval_pred):
+    
+    # Load metric function
+    accuracy_metric = evaluate.load('accuracy')
+    
     logits, labels = eval_pred
     predictions = np.argmax(logits, axis=-1)
     
@@ -25,12 +29,12 @@ def compute_metrics(eval_pred):
     return {'accuracy': accuracy['accuracy']}
 
 
-def makeDataset(input_text, target_text, tokenizer):
+def makeDataset(input_text, target_text, tokenizer, tokens_per_batch=512):
     # Set padding token if not already set
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
-    max_length = 512  # Define a reasonable max_length for inputs and targets
+    max_length = tokens_per_batch  # Define a reasonable max_length for inputs and targets
 
     # Tokenize the input and target texts
     input_encodings = tokenizer(input_text, padding='max_length', truncation=True, return_tensors='pt', max_length=max_length)
@@ -46,70 +50,119 @@ def makeDataset(input_text, target_text, tokenizer):
         'labels': target_ids
     })
 
+def train_model(model_name = 'HuggingFaceTB/SmolLM-135M', docstring_included = True, tokens_per_batch = 512):
+    # Set GPU
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    
+    output_directory = './results/' + model_name
 
-# Set GPU
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    trainingSetInputs = []
+    trainingSetTargets = []
+    
+    evaluationSetInputs = []
+    evalutionSetTargets = []
+    
+    testSetInputs = []
+    testSetTargets = []
+    
 
+    # load the datasets
+    if docstring_included:
+        
+        output_directory = output_directory + '_doc/'
+        
+        traindf = pd.read_csv('train_set_doc.csv')
+        evaldf = pd.read_csv('eval_set_doc.csv')
+        testdf = pd.read_csv('test_set_doc.csv')
 
-# Load your dataset (e.g., a dataset of docstring-function pairs for Julia)
-df = pd.read_csv('dataset.csv')
-df = df.dropna()
+        # Combine docstring and function signature as input
+        traindf['input_text'] = traindf['docstring'] + "\n" + traindf['function_signature']
+        traindf['target_text'] = traindf['function_body']
+        
+        evaldf['input_text'] = evaldf['docstring'] + "\n" + evaldf['function_signature']
+        evaldf['target_text'] = evaldf['function_body']
+        
+        testdf['input_text'] = testdf['docstring'] + "\n" + testdf['function_signature']
+        testdf['target_text'] = testdf['function_body']
+        
+        # # Split into training, evaluation, and test sets
+        trainingSetInputs = traindf['input_text'].tolist()
+        trainingSetTargets = traindf['target_text'].tolist()
+        
+        evaluationSetInputs = evaldf['input_text'].tolist()
+        evalutionSetTargets = evaldf['target_text'].tolist()
+        
+        testSetInputs = testdf['input_text'].tolist()
+        testSetTargets = testdf['target_text'].tolist()
+        
+    else:
+        traindf = pd.read_csv('train_set.csv')
+        evaldf = pd.read_csv('eval_set.csv')
+        testdf = pd.read_csv('test_set.csv')
+        
+        output_directory = output_directory + '/'
+        
+        trainingSetInputs = traindf['function_signature'].tolist()
+        trainingSetTargets = traindf['function_body'].tolist()
+        
+        evaluationSetInputs = evaldf['function_signature'].tolist()
+        evalutionSetTargets = evaldf['function_body'].tolist()
+        
+        testSetInputs = testdf['function_signature'].tolist()
+        testSetTargets = testdf['function_body'].tolist()
+        
+    print('data loaded')
 
-# Combine docstring and function signature as input
-df['input_text'] = df['docstring'] + "\n" + df['function_signature']
-df['target_text'] = df['function_body']
+    # Prepare tokenizer and model for Julia
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
 
-# # Split into training, evaluation, and test sets
-trainingSetInputs = df['input_text'].tolist()
-trainingSetTargets = df['target_text'].tolist()
-# evaluationSet = df[df['split'] == 'eval']['input_text'].tolist()
-# testSet = df[df['split'] == 'test']['input_text'].tolist()
+    # Tokenize the dataset
+    trainingSet = makeDataset(trainingSetInputs, trainingSetTargets, tokenizer)
+    evaluationSet = makeDataset(evaluationSetInputs, evalutionSetTargets, tokenizer)
+    testSet = makeDataset(testSetInputs, testSetTargets, tokenizer)
+    
+    print('datasets created')
 
-# Prepare tokenizer and model for Julia
-model_name = 'HuggingFaceTB/SmolLM-135M'
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name)
+    # Define training arguments
+    training_args = TrainingArguments(
+        output_dir=output_directory,
+        eval_strategy='epoch',  # Evaluate at the end of each epoch
+        learning_rate=2e-5,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=8,
+        num_train_epochs=3,
+        weight_decay=0.01,
+        save_strategy='epoch',  # Save at the end of each epoch
+        save_total_limit=1,  # Keep only the most recent model
+        load_best_model_at_end=True,  # Automatically load the best model at the end
+        metric_for_best_model='eval_loss',  # Use evaluation loss to select the best model
+        greater_is_better=False,  # Lower loss is better
+    )
 
-# Tokenize the dataset
-trainingSet = makeDataset(trainingSetInputs, trainingSetTargets, tokenizer)
-# evaluationSet = makeDataset(evaluationSet, tokenizer)
-# testSet = makeDataset(testSet, tokenizer)
+    # Create the Trainer instance
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=trainingSet,
+        eval_dataset=trainingSet,
+        compute_metrics=compute_metrics,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=5)],  # Early stopping with patience
+    )
 
-# Load metric function
-accuracy_metric = evaluate.load('accuracy')
+    # Train the model
+    trainer.train()
 
-# Define training arguments
-training_args = TrainingArguments(
-    output_dir='./results',
-    eval_strategy='epoch',  # Evaluate at the end of each epoch
-    learning_rate=2e-5,
-    per_device_train_batch_size=4,
-    per_device_eval_batch_size=8,
-    num_train_epochs=3,
-    weight_decay=0.01,
-    save_strategy='epoch',  # Save at the end of each epoch
-    save_total_limit=1,  # Keep only the most recent model
-    load_best_model_at_end=True,  # Automatically load the best model at the end
-    metric_for_best_model='eval_loss',  # Use evaluation loss to select the best model
-    greater_is_better=False,  # Lower loss is better
-)
+    # Evaluate the model
+    print('Evaluating model on TEST SET')
+    trainer.evaluate(testSet)
 
-# Create the Trainer instance
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=trainingSet,
-    eval_dataset=trainingSet,
-    compute_metrics=compute_metrics,
-    callbacks=[EarlyStoppingCallback(early_stopping_patience=5)],  # Early stopping with patience
-)
-
-# Train the model
-trainer.train()
-
-# Evaluate the model
-# print('Evaluating model on TEST SET')
-# trainer.evaluate(testSet)
-
-print('FINISHED')
+    print('FINISHED')
+    
+    
+if __name__ == '__main__':
+    # link = sys.argv[1]
+    # filename = sys.argv[2]
+    print('Training model') 
+    train_model()
