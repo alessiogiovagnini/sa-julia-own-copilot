@@ -3,3 +3,9 @@ sh==2.1.0
 pandas
 tree_sitter_julia
 tqdm
+scikit-learn
+numpy
+evaluate
+datasets
+torch
+accelerate

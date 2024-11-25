@@ -1,10 +1,10 @@
 import os
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from datasets import Dataset
 from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
 import numpy as np
 import evaluate
+from datasets import Dataset
 
 # Define compute metrics function
 def compute_metrics(eval_pred):
@@ -37,8 +37,8 @@ def makeDataset(input_text, target_text, tokenizer, tokens_per_batch=512):
     max_length = tokens_per_batch  # Define a reasonable max_length for inputs and targets
 
     # Tokenize the input and target texts
-    input_encodings = tokenizer(input_text, padding='max_length', truncation=True, return_tensors='pt', max_length=max_length)
-    target_encodings = tokenizer(target_text, padding='max_length', truncation=True, return_tensors='pt', max_length=max_length)
+    input_encodings = tokenizer(input_text, padding='max_length', truncation=True, return_tensors='pt', max_length=max_length).to("cuda")
+    target_encodings = tokenizer(target_text, padding='max_length', truncation=True, return_tensors='pt', max_length=max_length).to("cuda")
     
     # Ensure labels are aligned with input
     target_ids = target_encodings['input_ids']
@@ -119,8 +119,11 @@ def train_model(model_name = 'HuggingFaceTB/SmolLM-135M', docstring_included = T
     model = AutoModelForCausalLM.from_pretrained(model_name)
 
     # Tokenize the dataset
+    print('started training dataset creation')
     trainingSet = makeDataset(trainingSetInputs, trainingSetTargets, tokenizer)
+    print('started evaluation dataset creation')
     evaluationSet = makeDataset(evaluationSetInputs, evalutionSetTargets, tokenizer)
+    print('started test dataset creation')
     testSet = makeDataset(testSetInputs, testSetTargets, tokenizer)
     
     print('datasets created')
@@ -132,7 +135,7 @@ def train_model(model_name = 'HuggingFaceTB/SmolLM-135M', docstring_included = T
         learning_rate=2e-5,
         per_device_train_batch_size=4,
         per_device_eval_batch_size=8,
-        num_train_epochs=3,
+        num_train_epochs=30,
         weight_decay=0.01,
         save_strategy='epoch',  # Save at the end of each epoch
         save_total_limit=1,  # Keep only the most recent model
@@ -146,7 +149,7 @@ def train_model(model_name = 'HuggingFaceTB/SmolLM-135M', docstring_included = T
         model=model,
         args=training_args,
         train_dataset=trainingSet,
-        eval_dataset=trainingSet,
+        eval_dataset=evaluationSet,
         compute_metrics=compute_metrics,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=5)],  # Early stopping with patience
     )
