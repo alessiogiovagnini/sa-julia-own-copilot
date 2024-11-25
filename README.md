@@ -18,3 +18,15 @@ installing requirements
 ```shell
 pip install -r requirements.txt
 ```
+
+# Running the scripts
+Downloading all the data from the repository:
+```shell
+cd scripts
+python clone-repo.py
+```
+This will generate a list of csv file in the folder `csv_output`,
+then to merge the files in one:
+```shell
+python merge_csv.py
+```
