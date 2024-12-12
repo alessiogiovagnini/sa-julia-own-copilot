@@ -5,143 +5,44 @@ from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
 import numpy as np
 import evaluate
 from datasets import Dataset
+import torch
+from datetime import datetime
 
-# Define compute metrics function
-def compute_metrics(eval_pred):
+def train_model(model_name='HuggingFaceTB/SmolLM-135M', docstring_included=True, dataset_path = './datasets/135MtrainingDoc'):
+    print('Training model') 
     
-    # Load metric function
-    accuracy_metric = evaluate.load('accuracy')
+    # HuggingFaceTB/SmolLM-1.7B
+    # HuggingFaceTB/SmolLM-360M
     
-    logits, labels = eval_pred
-    predictions = np.argmax(logits, axis=-1)
-    
-    # Flatten the arrays and remove -100 from labels and corresponding predictions
-    flattened_labels = labels.flatten()
-    flattened_predictions = predictions.flatten()
-
-    # Mask out padding values (-100) in the labels
-    mask = flattened_labels != -100
-    filtered_labels = flattened_labels[mask]
-    filtered_predictions = flattened_predictions[mask]
-    
-    # Compute accuracy
-    accuracy = accuracy_metric.compute(predictions=filtered_predictions, references=filtered_labels)
-    return {'accuracy': accuracy['accuracy']}
-
-
-def makeDataset(input_text, target_text, tokenizer, tokens_per_batch=512):
-    # Set padding token if not already set
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    
-    max_length = tokens_per_batch  # Define a reasonable max_length for inputs and targets
-
-    # Tokenize the input and target texts
-    input_encodings = tokenizer(input_text, padding='max_length', truncation=True, return_tensors='pt', max_length=max_length).to("cuda")
-    target_encodings = tokenizer(target_text, padding='max_length', truncation=True, return_tensors='pt', max_length=max_length).to("cuda")
-    
-    # Ensure labels are aligned with input
-    target_ids = target_encodings['input_ids']
-    target_ids[target_ids == tokenizer.pad_token_id] = -100  # Ignore padding tokens in the loss computation
-
-    return Dataset.from_dict({
-        'input_ids': input_encodings['input_ids'],
-        'attention_mask': input_encodings['attention_mask'],
-        'labels': target_ids
-    })
-
-def train_model(model_name = 'HuggingFaceTB/SmolLM-135M', docstring_included = True, tokens_per_batch = 512):
     # Set GPU
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    # torch.cuda.set_device(1)
+
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    model_name_stripped = model_name.split('/')[1]
+    date = datetime.now().strftime("%d_%m_%Y")
+    output_dir_pedix = '_doc/' if docstring_included else '/'
+    output_directory = './results/' + model_name_stripped + '_' + date + output_dir_pedix
     
-    output_directory = './results/' + model_name
-
-    trainingSetInputs = []
-    trainingSetTargets = []
-    
-    evaluationSetInputs = []
-    evalutionSetTargets = []
-    
-    testSetInputs = []
-    testSetTargets = []
-    
-
-    # load the datasets
-    if docstring_included:
-        
-        output_directory = output_directory + '_doc/'
-        
-        traindf = pd.read_csv('train_set_doc.csv')
-        evaldf = pd.read_csv('eval_set_doc.csv')
-        testdf = pd.read_csv('test_set_doc.csv')
-
-        # Combine docstring and function signature as input
-        traindf['input_text'] = traindf['docstring'] + "\n" + traindf['function_signature']
-        traindf['target_text'] = traindf['function_body']
-        
-        evaldf['input_text'] = evaldf['docstring'] + "\n" + evaldf['function_signature']
-        evaldf['target_text'] = evaldf['function_body']
-        
-        testdf['input_text'] = testdf['docstring'] + "\n" + testdf['function_signature']
-        testdf['target_text'] = testdf['function_body']
-        
-        # # Split into training, evaluation, and test sets
-        trainingSetInputs = traindf['input_text'].tolist()
-        trainingSetTargets = traindf['target_text'].tolist()
-        
-        evaluationSetInputs = evaldf['input_text'].tolist()
-        evalutionSetTargets = evaldf['target_text'].tolist()
-        
-        testSetInputs = testdf['input_text'].tolist()
-        testSetTargets = testdf['target_text'].tolist()
-        
-    else:
-        traindf = pd.read_csv('train_set.csv')
-        evaldf = pd.read_csv('eval_set.csv')
-        testdf = pd.read_csv('test_set.csv')
-        
-        output_directory = output_directory + '/'
-        
-        trainingSetInputs = traindf['function_signature'].tolist()
-        trainingSetTargets = traindf['function_body'].tolist()
-        
-        evaluationSetInputs = evaldf['function_signature'].tolist()
-        evalutionSetTargets = evaldf['function_body'].tolist()
-        
-        testSetInputs = testdf['function_signature'].tolist()
-        testSetTargets = testdf['function_body'].tolist()
-        
-    print('data loaded')
-
     # Prepare tokenizer and model for Julia
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(model_name)
 
-    # Tokenize the dataset
-    print('started training dataset creation')
-    trainingSet = makeDataset(trainingSetInputs, trainingSetTargets, tokenizer)
-    print('started evaluation dataset creation')
-    evaluationSet = makeDataset(evaluationSetInputs, evalutionSetTargets, tokenizer)
-    print('started test dataset creation')
-    testSet = makeDataset(testSetInputs, testSetTargets, tokenizer)
-    
-    print('datasets created')
+    # Load datasets
+    trainingSet = Dataset.load_from_disk(dataset_path)
+    # trainingSet = trainingSet.select(range(2))
+    print('datasets loaded')
 
     # Define training arguments
     training_args = TrainingArguments(
         output_dir=output_directory,
-        eval_strategy='epoch',  # Evaluate at the end of each epoch
-        learning_rate=2e-5,
-        per_device_train_batch_size=4,
-        per_device_eval_batch_size=8,
-        num_train_epochs=30,
-        weight_decay=0.01,
+        logging_dir='./logs',
         save_strategy='epoch',  # Save at the end of each epoch
-        save_total_limit=1,  # Keep only the most recent model
-        load_best_model_at_end=True,  # Automatically load the best model at the end
-        metric_for_best_model='eval_loss',  # Use evaluation loss to select the best model
-        greater_is_better=False,  # Lower loss is better
+        learning_rate=2e-5,
+        per_device_train_batch_size=1,
+        num_train_epochs=3,
+        weight_decay=0.01,
+        save_total_limit=None,  # Keep all checkpoints
+        evaluation_strategy='no',  # No evaluation
     )
 
     # Create the Trainer instance
@@ -149,23 +50,36 @@ def train_model(model_name = 'HuggingFaceTB/SmolLM-135M', docstring_included = T
         model=model,
         args=training_args,
         train_dataset=trainingSet,
-        eval_dataset=evaluationSet,
-        compute_metrics=compute_metrics,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=5)],  # Early stopping with patience
     )
 
     # Train the model
     trainer.train()
-
-    # Evaluate the model
-    print('Evaluating model on TEST SET')
-    trainer.evaluate(testSet)
-
     print('FINISHED')
-    
     
 if __name__ == '__main__':
     # link = sys.argv[1]
     # filename = sys.argv[2]
-    print('Training model') 
-    train_model()
+    # train_model('HuggingFaceTB/SmolLM-135M',True,'./datasets/135MDocTrainSet')
+    
+    # print('###############')
+    # print('FIRST COMPLETED')
+    # print('###############')
+    
+    # train_model('HuggingFaceTB/SmolLM-135M',False, dataset_path = './datasets/135MTrainSet')
+    
+    
+    # train_model('HuggingFaceTB/SmolLM-360M',True, dataset_path = './datasets/360MDocTrainSet')
+    
+    # train_model('HuggingFaceTB/SmolLM-360M',False, dataset_path = './datasets/360MTrainSet')
+    
+
+    
+    train_model('HuggingFaceTB/SmolLM-1.7B',True, dataset_path = './datasets/1.7BDocTrainSet')
+    
+    print('###############')
+    print('FIRST COMPLETED')
+    print('###############')
+    
+    train_model('HuggingFaceTB/SmolLM-1.7B',False, dataset_path = './datasets/1.7BTrainSet')
+    
+    
