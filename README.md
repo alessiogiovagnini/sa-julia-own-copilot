@@ -30,3 +30,11 @@ then to merge the files in one:
 ```shell
 python merge_csv.py
 ```
+
+# Other scripts
+`remove_benchmark_functions.py` is used to remove the benchmark functions
+from the dataset, you need to edit the paths inside the script.
+
+`statistics.py` is used to calculate the statistics from the json files
+resulting from the `evaluate.sh` script, you also need to edit the paths
+inside the script.
